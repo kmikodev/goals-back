@@ -4,6 +4,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
   // Add your production domains here
+  '*'
 ];
 
 const corsOptions = {
