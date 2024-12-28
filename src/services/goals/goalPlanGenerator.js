@@ -4,7 +4,7 @@ import { SYSTEM_PROMPTS } from '../../utils/prompts.js';
 export const generateGoalPlan = async (userPrompt) => {
   try {
     const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4',
       messages: [
         {
           role: 'system',
