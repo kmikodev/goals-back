@@ -51,9 +51,9 @@ router.get('/:id/details', verifyToken, async (req, res) => {
 // Create new goal with AI-generated plan
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { title, description, startDate, endDate, duration, prompt } = req.body;
+    const { title, description, startDate, endDate, duration } = req.body;
     const userId = req.user.uid;
-
+    const prompt = `${title} ${description}`;
     // Generate plan using GPT
     const planData = await generateGoalPlan(prompt);
 
