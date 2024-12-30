@@ -3,6 +3,7 @@ import { verifyToken } from '../middleware/auth.js';
 import { Goal } from '../models/Goal.js';
 import { Milestone } from '../models/Milestone.js';
 import { DailyTask } from '../models/DailyTask.js';
+import { Step } from '../models/Step.js';
 import { generateGoalPlan } from '../services/goals/goalPlanGenerator.js';
 
 const router = express.Router();
@@ -34,11 +35,15 @@ router.get('/:id/details', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Goal not found' });
     }
 
-    const milestones = await Milestone.find({ goalId: id });
-    const dailyTasks = await DailyTask.find({ goalId: id });
+    const [steps, milestones, dailyTasks] = await Promise.all([
+      Step.find({ goalId: id }),
+      Milestone.find({ goalId: id }),
+      DailyTask.find({ goalId: id })
+    ]);
 
     res.json({
       ...goal.toObject(),
+      steps,
       milestones,
       dailyTasks
     });
@@ -47,21 +52,23 @@ router.get('/:id/details', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to get goal details' });
   }
 });
-
 // Create new goal with AI-generated plan
 router.post('/', verifyToken, async (req, res) => {
   try {
     const { title, description, startDate, endDate, duration } = req.body;
     const userId = req.user.uid;
     const prompt = `${title} ${description}`;
+    
     // Generate plan using GPT
+    console.log('Generating plan for:', prompt);
     const planData = await generateGoalPlan(prompt);
+    console.log('Received plan data:', planData);
 
     // Create goal
     const goal = new Goal({
       userId,
-      title: planData.title || title,
-      description: planData.description || description,
+      title: planData.goal?.title || title,
+      description: planData.goal?.description || description,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       duration,
@@ -71,40 +78,70 @@ router.post('/', verifyToken, async (req, res) => {
 
     await goal.save();
 
+    // Create steps
+    const steps = planData.steps ? await Promise.all(
+      planData.steps.map(step => 
+        new Step({
+          goalId: goal._id,
+          weekNumber: step.weekNumber,
+          title: step.title,
+          description: step.description,
+          date: new Date(step.date),
+          metrics: step.metrics,
+          frequency: step.frequency,
+          isCompleted: false
+        }).save()
+      )
+    ) : [];
+
     // Create milestones
-    const milestones = await Promise.all(
+    const milestones = planData.milestones ? await Promise.all(
       planData.milestones.map(milestone => 
         new Milestone({
           goalId: goal._id,
           title: milestone.title,
           description: milestone.description,
-          dueDate: new Date(milestone.dueDate)
+          dueDate: new Date(milestone.dueDate),
+          isCompleted: false
         }).save()
       )
-    );
+    ) : [];
 
     // Create daily tasks
-    const dailyTasks = await Promise.all(
+    const dailyTasks = planData.dailyTasks ? await Promise.all(
       planData.dailyTasks.map(task => 
         new DailyTask({
           goalId: goal._id,
           title: task.title,
           description: task.description,
-          date: new Date(task.date)
+          date: new Date(task.date),
+          isCompleted: false
         }).save()
       )
-    );
+    ) : [];
 
-    res.json({
+    const result = {
       ...goal.toObject(),
+      steps,
       milestones,
       dailyTasks
-    });
+    };
+
+    console.log('Created goal with all data:', result);
+    res.json(result);
+
   } catch (error) {
-    console.error('Error creating goal:', error);
-    res.status(500).json({ error: 'Failed to create goal' });
+    console.error('Detailed error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to create goal',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
+
+
 
 // Update goal progress
 router.patch('/:id/progress', verifyToken, async (req, res) => {
