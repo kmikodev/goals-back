@@ -14,7 +14,7 @@ RUN bun pm cache rm --all
 RUN bun install
 
 # Expone el puerto en el que tu aplicación estará escuchando
-EXPOSE 3000
+EXPOSE 3010
 
 # El comando para iniciar tu aplicación
 CMD ["bun", "start"]
