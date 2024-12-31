@@ -10,7 +10,7 @@ import statsRoutes from './routes/stats';
 import profileRoutes from './routes/profile';
 
 dotenv.config();
-
+console.log('Hello from goals-back/src/index.ts');
 // Connect to MongoDB
 connectDB();
 
